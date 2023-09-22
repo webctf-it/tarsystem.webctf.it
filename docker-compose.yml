@@ -1,0 +1,57 @@
+version: "3.8"
+services:
+  php:
+      restart: always
+      build: './php/'
+      read_only: true
+      tmpfs:
+         - /tmp
+      volumes:
+          - ./public_html/:/var/www/html/:ro
+          # Enable this volume to have an "upload" folder writeable from anyone from inside the docker
+          # Remember to chmod 777 the public_html_upload folder
+          # Remember to put another service (maybe a cron?) that periodically empties the public_html_upload folder and try to limit its size to prevent abuse
+          - ./public_html_upload/:/var/www/html/upload/:rw
+          # PAY ATTENTION: SOCK FOLDER NEEDS TO HAVE SETGID AND TO BE CHOWNED TO WWW-DATA GROUP. OTHER SETTINGS ARE NOT SECURE!
+          - ./sock/:/sock/:rw
+      networks:
+          - default
+          - nginx_nolog
+      logging:
+          driver: "json-file"
+          options:
+              max-file: "1"
+              max-size: "10m"
+      #healthcheck:
+      #    test: "curl --fail -s --resolve 'tarsystem.webctf.it:443:172.17.0.1' https://tarsystem.webctf.it"
+      #    timeout: 15s
+      #    interval: 2m30s
+      #    retries: 2
+  cron:
+      restart: always
+      build: './cron'
+      read_only: true
+      tmpfs:
+          - /tmp
+      depends_on:
+          - php
+      volumes:
+          - ./public_html_upload/:/upload/:rw
+      logging:
+          driver: "json-file"
+          options:
+              max-file: "1"
+              max-size: "256k"    
+      #healthcheck:
+      #    test: "(test -f /tmp/healthcheck_file && rm -f /tmp/healthcheck_file) || exit 1"
+      #    timeout: 10s
+      #    interval: 8m
+      #    retries: 1
+
+networks:
+    default:
+        driver_opts:
+            com.docker.network.bridge.name: tarsystem
+        internal: true
+    nginx_nolog:
+        external: true
